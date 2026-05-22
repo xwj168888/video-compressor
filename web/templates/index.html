@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频压缩工具</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+  background: #0f0f0f; color: #e0e0e0;
+  min-height: 100vh; display: flex; justify-content: center; align-items: center;
+}
+.container { width: 100%; max-width: 640px; padding: 24px; }
+
+h1 { text-align: center; font-size: 24px; margin-bottom: 6px; }
+.subtitle { text-align: center; color: #888; margin-bottom: 28px; font-size: 14px; }
+
+.step { display: none; }
+
+/* ---- Upload ---- */
+.drop-zone {
+  border: 2px dashed #444; border-radius: 16px;
+  padding: 48px 24px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: #1a1a1a; margin-bottom: 20px;
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color: #3b82f6; background: #1e2a3a; }
+.drop-zone svg { width: 48px; height: 48px; margin-bottom: 12px; color: #666; }
+.drop-zone .hint { font-size: 16px; margin-bottom: 4px; }
+.drop-zone .hint-sub { font-size: 13px; color: #666; }
+
+.file-bar {
+  background: #1a1a1a; border-radius: 12px; padding: 14px 18px;
+  margin-bottom: 20px; display: flex; align-items: center; gap: 14px;
+}
+.file-bar .fb-icon { font-size: 28px; }
+.file-bar .fb-info { flex: 1; min-width: 0; }
+.file-bar .fb-name { font-size: 15px; font-weight: 600; word-break: break-all; }
+.file-bar .fb-size { font-size: 13px; color: #888; margin-top: 2px; }
+.file-bar .fb-clear { background: none; border: none; color: #666; cursor: pointer; font-size: 20px; padding: 4px 8px; }
+.file-bar .fb-clear:hover { color: #f87171; }
+
+.section-label { font-size: 13px; color: #888; margin-bottom: 8px; display: block; }
+.profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.profile-card {
+  background: #1a1a1a; border: 2px solid transparent;
+  border-radius: 12px; padding: 12px 14px; cursor: pointer; transition: all 0.15s;
+}
+.profile-card:hover { border-color: #444; }
+.profile-card.active { border-color: #3b82f6; background: #1e2a3a; }
+.profile-card .pname { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.profile-card .pdesc { font-size: 12px; color: #888; }
+
+.target-row { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.target-row input {
+  background: #1a1a1a; border: 1px solid #444; border-radius: 8px;
+  padding: 10px 14px; color: #e0e0e0; font-size: 14px; width: 110px;
+}
+.target-row input:focus { outline: none; border-color: #3b82f6; }
+.target-row label { font-size: 14px; color: #999; }
+
+.btn {
+  background: #3b82f6; color: white; border: none; border-radius: 10px;
+  padding: 12px 32px; font-size: 15px; font-weight: 600; cursor: pointer;
+  width: 100%; transition: background 0.15s;
+}
+.btn:hover { background: #2563eb; }
+.btn:disabled { background: #333; color: #666; cursor: not-allowed; }
+.btn-reset { background: #333 !important; }
+.btn-reset:hover { background: #444 !important; }
+
+/* ---- Progress (shared) ---- */
+.progress-wrap { margin-bottom: 24px; }
+.progress-bar-bg {
+  background: #1a1a1a; border-radius: 8px; height: 10px; overflow: hidden; margin-bottom: 10px;
+}
+.progress-bar-fg {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  height: 100%; border-radius: 8px; width: 0%; transition: width 0.3s;
+}
+/* Pulsing bar for indeterminate state */
+.progress-bar-fg.indeterminate {
+  width: 30% !important;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { margin-left: 0%; }
+  50% { margin-left: 70%; }
+}
+
+/* ---- Phase indicator ---- */
+.phase-row {
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  margin-bottom: 20px;
+}
+.phase-step {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; color: #555; transition: color 0.3s;
+}
+.phase-step .dot {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #1a1a1a; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; transition: all 0.3s;
+}
+.phase-step.active { color: #e0e0e0; }
+.phase-step.active .dot { background: #3b82f6; }
+.phase-step.done { color: #22c55e; }
+.phase-step.done .dot { background: #166534; }
+.phase-arrow { color: #333; margin: 0 8px; font-size: 14px; }
+
+/* ---- Progress detail ---- */
+.progress-detail {
+  display: flex; justify-content: space-between; font-size: 12px;
+  margin-top: 6px;
+}
+
+/* ---- Result ---- */
+.result { background: #1a1a1a; border-radius: 12px; padding: 24px; text-align: center; }
+.result .emoji { font-size: 44px; margin-bottom: 10px; }
+.result .title { font-weight: 700; font-size: 18px; margin-bottom: 12px; }
+.result .stats { display: flex; justify-content: center; gap: 32px; margin: 16px 0; }
+.result .stat { text-align: center; }
+.result .stat-val { font-size: 22px; font-weight: 700; }
+.result .stat-label { font-size: 12px; color: #888; margin-top: 2px; }
+.result .ratio { font-size: 14px; color: #22c55e; margin-bottom: 18px; }
+.result .actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.result .btn { width: auto; }
+.error-text { color: #f87171; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>视频压缩</h1>
+  <p class="subtitle">支持 500MB–1GB 短视频 · Intel / NVIDIA / AMD 硬件加速</p>
+
+  <!-- Step 1: Upload -->
+  <div class="step" id="stepUpload" style="display:block">
+    <div class="drop-zone" id="dropZone">
+      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+      <div class="hint">点击上传或拖拽视频到此处</div>
+      <div class="hint-sub">支持 MOV / MP4 / AVI / MKV，最大 5GB</div>
+    </div>
+    <input type="file" id="fileInput" accept="video/*" hidden>
+
+    <div class="file-bar" id="fileBar" style="display:none">
+      <span class="fb-icon">🎬</span>
+      <div class="fb-info">
+        <div class="fb-name" id="fbName"></div>
+        <div class="fb-size" id="fbSize"></div>
+      </div>
+      <button class="fb-clear" id="fbClear" title="清除">✕</button>
+    </div>
+
+    <div class="section-label">压缩配置</div>
+    <div class="profile-grid" id="profileGrid"></div>
+    <div class="target-row">
+      <label>目标大小 (可选):</label>
+      <input type="number" id="targetSize" placeholder="MB" min="1" step="1">
+      <span style="font-size:13px;color:#666;">留空由配置决定</span>
+    </div>
+    <button class="btn" id="compressBtn" disabled>开始压缩</button>
+  </div>
+
+  <!-- Step 2: Progress -->
+  <div class="step" id="stepProgress">
+    <!-- Phase indicator -->
+    <div class="phase-row">
+      <div class="phase-step active" id="phaseUpload">
+        <span class="dot">📤</span><span>上传</span>
+      </div>
+      <span class="phase-arrow">→</span>
+      <div class="phase-step" id="phaseProbe">
+        <span class="dot">🔍</span><span>分析</span>
+      </div>
+      <span class="phase-arrow">→</span>
+      <div class="phase-step" id="phaseCompress">
+        <span class="dot">🗜️</span><span>压缩</span>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-wrap">
+      <div class="progress-bar-bg"><div class="progress-bar-fg" id="progressBar"></div></div>
+      <div class="progress-text" id="progressText">准备上传...</div>
+    </div>
+  </div>
+
+  <!-- Step 3: Result -->
+  <div class="step" id="stepResult"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const fileBar = $('fileBar');
+const compressBtn = $('compressBtn');
+const stepUpload = $('stepUpload');
+const stepProgress = $('stepProgress');
+const stepResult = $('stepResult');
+
+let selectedFile = null;
+let selectedProfile = 'ai';
+
+// ---- Load profiles ----
+fetch('/api/profiles')
+  .then(r => r.json())
+  .then(profiles => {
+    const grid = $('profileGrid');
+    Object.entries(profiles).forEach(([key, p]) => {
+      const card = document.createElement('div');
+      card.className = 'profile-card' + (key === 'ai' ? ' active' : '');
+      card.innerHTML = `<div class="pname">${p.name}</div><div class="pdesc">${p.description}</div>`;
+      card.addEventListener('click', () => {
+        document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        selectedProfile = key;
+      });
+      grid.appendChild(card);
+    });
+  });
+
+// ---- Upload events ----
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length > 0) selectFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length > 0) selectFile(fileInput.files[0]);
+});
+$('fbClear').addEventListener('click', () => {
+  selectedFile = null;
+  fileInput.value = '';
+  fileBar.style.display = 'none';
+  compressBtn.disabled = true;
+});
+
+function selectFile(file) {
+  selectedFile = file;
+  $('fbName').textContent = file.name;
+  $('fbSize').textContent = formatSize(file.size);
+  fileBar.style.display = 'flex';
+  compressBtn.disabled = false;
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+// ---- Phase helpers ----
+function setPhase(phase) {
+  ['Upload', 'Probe', 'Compress'].forEach(p => {
+    const el = $('phase' + p);
+    el.classList.remove('active', 'done');
+  });
+
+  const order = ['Upload', 'Probe', 'Compress'];
+  const idx = order.indexOf(phase);
+  order.forEach((p, i) => {
+    const el = $('phase' + p);
+    if (i < idx) el.classList.add('done');
+    if (i === idx) el.classList.add('active');
+  });
+
+  const bar = $('progressBar');
+  bar.classList.remove('indeterminate');
+}
+
+// ---- Compress ----
+compressBtn.addEventListener('click', () => {
+  if (!selectedFile) return;
+
+  stepUpload.style.display = 'none';
+  stepProgress.style.display = 'block';
+  stepResult.innerHTML = '';
+  stepResult.style.display = 'none';
+
+  // Reset UI
+  setPhase('Upload');
+  $('progressBar').style.width = '0%';
+  $('progressBar').classList.remove('indeterminate');
+  $('progressText').textContent = '上传中...';
+
+  const form = new FormData();
+  form.append('file', selectedFile);
+  form.append('profile', selectedProfile);
+  const ts = $('targetSize').value.trim();
+  if (ts) form.append('target_size', ts);
+
+  const xhr = new XMLHttpRequest();
+  let uploadSpeed = 0;
+  let lastLoaded = 0;
+  let lastTime = Date.now();
+
+  xhr.upload.addEventListener('progress', e => {
+    if (e.lengthComputable) {
+      const pct = Math.round(e.loaded / e.total * 100);
+      $('progressBar').style.width = pct + '%';
+
+      const now = Date.now();
+      const dt = (now - lastTime) / 1000;
+      if (dt > 0.5) {
+        uploadSpeed = (e.loaded - lastLoaded) / dt;
+        lastLoaded = e.loaded;
+        lastTime = now;
+      }
+
+      const loaded = formatSize(e.loaded);
+      const total = formatSize(e.total);
+      const speedStr = uploadSpeed > 0 ? formatSize(uploadSpeed) + '/s' : '';
+      $('progressText').textContent = `上传中 ${pct}%  (${loaded} / ${total}) ${speedStr}`;
+
+      if (pct >= 100) {
+        setPhase('Probe');
+        $('progressBar').classList.add('indeterminate');
+        $('progressText').textContent = '上传完成，正在分析视频...';
+      }
+    }
+  });
+
+  xhr.addEventListener('load', () => {
+    if (xhr.status !== 200) {
+      showError('上传失败: HTTP ' + xhr.status);
+      return;
+    }
+    try {
+      const data = JSON.parse(xhr.responseText);
+      if (data.error) { showError(data.error); return; }
+
+      // Transition to compression phase
+      setPhase('Compress');
+      $('progressBar').classList.remove('indeterminate');
+      $('progressBar').style.width = '0%';
+      $('progressText').textContent = '正在压缩...';
+      pollProgress(data.job_id);
+    } catch (e) {
+      showError('解析响应失败: ' + e.message);
+    }
+  });
+
+  xhr.addEventListener('error', () => showError('网络错误，请重试'));
+  xhr.open('POST', '/api/compress');
+  xhr.send(form);
+});
+
+function pollProgress(jobId) {
+  const es = new EventSource('/api/progress/' + jobId);
+
+  es.onmessage = e => {
+    const data = JSON.parse(e.data);
+    $('progressBar').style.width = data.progress + '%';
+
+    // Show meaningful status text
+    const status = data.status || '';
+    if (status.includes('开始压缩') || status.includes('0%')) {
+      $('progressText').textContent = '正在分析视频参数...';
+    } else if (data.progress < 100) {
+      $('progressText').textContent = `压缩中 ${data.progress}%`;
+    } else {
+      $('progressText').textContent = '压缩完成，正在封装文件...';
+    }
+
+    if (data.error) { es.close(); showError(data.error); }
+    if (data.output) {
+      es.close();
+      setPhase('Compress');
+      $('phaseCompress').classList.add('done');
+      $('phaseCompress').classList.remove('active');
+      $('progressBar').style.width = '100%';
+      $('progressText').textContent = '完成！';
+      showResult(data.output, jobId);
+    }
+  };
+
+  es.onerror = () => { es.close(); };
+}
+
+function showResult(output, jobId) {
+  stepProgress.style.display = 'none';
+  stepResult.style.display = 'block';
+  stepResult.innerHTML = `
+    <div class="result">
+      <div class="emoji">✅</div>
+      <div class="title">压缩完成</div>
+      <div class="stats">
+        <div class="stat"><div class="stat-val">${output.input_size_mb} MB</div><div class="stat-label">压缩前</div></div>
+        <div class="stat"><div class="stat-val">${output.output_size_mb} MB</div><div class="stat-label">压缩后</div></div>
+      </div>
+      <div class="ratio">体积减小 ${output.ratio}%</div>
+      <div class="actions">
+        <a href="${output.download_url}" class="btn" download>下载压缩视频</a>
+        <button class="btn btn-reset" onclick="resetAll()">压缩另一个视频</button>
+      </div>
+    </div>
+  `;
+}
+
+function showError(msg) {
+  stepProgress.style.display = 'none';
+  stepResult.style.display = 'block';
+  stepResult.innerHTML = `
+    <div class="result">
+      <div class="emoji">❌</div>
+      <div class="title">出错了</div>
+      <div class="error-text">${msg}</div>
+      <button class="btn btn-reset" onclick="resetAll()">重试</button>
+    </div>
+  `;
+}
+
+function resetAll() {
+  stepUpload.style.display = 'block';
+  stepProgress.style.display = 'none';
+  stepResult.innerHTML = '';
+  stepResult.style.display = 'none';
+  $('progressBar').style.width = '0%';
+  $('progressBar').classList.remove('indeterminate');
+  $('progressText').textContent = '准备中...';
+}
+</script>
+</body>
+</html>

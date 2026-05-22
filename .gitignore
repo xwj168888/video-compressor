@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime data
+data/
+web/uploads/
+web/outputs/
+
+# macOS
+__MACOSX/
+.DS_Store
+._*
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml
+
+# Temp
+*.log

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.venv
+*.egg-info/
+.git/
+.gitignore
+*.md
+.DS_Store
+__MACOSX/
+data/
